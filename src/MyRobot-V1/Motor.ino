@@ -32,4 +32,49 @@ void stop(int in1, int in2, int enA) {
     digitalWrite(enA, LOW);   // Disable motor driver
 }
 
-// TODO: add your own driving functions here
+/**
+ * @brief Drives a single motor at specified speed and direction.
+ */
+void driveMotor(int in1, int in2, int enA, int speed, bool forward) {
+    if (forward) {
+        digitalWrite(in1, LOW);
+        digitalWrite(in2, HIGH);
+    } else {
+        digitalWrite(in1, HIGH);
+        digitalWrite(in2, LOW);
+    }
+    analogWrite(enA, speed);
+}
+
+/**
+ * @brief Stop a single motor immediately.
+ */
+void stopMotor(int in1, int in2, int enA) {
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    analogWrite(enA, 0);
+}
+
+/**
+ * @brief Drive the robot forward.
+ */
+void forward(int speed = 200) {
+    driveMotor(in1, in2, enA, speed, true);
+    driveMotor(in3, in4, enB, speed, true);
+}
+
+/**
+ * @brief Drive the robot backward.
+ */
+void backward(int speed = 200) {
+    driveMotor(in1, in2, enA, speed, false);
+    driveMotor(in3, in4, enB, speed, false);
+}
+
+/**
+ * @brief Stop the robot.
+ */
+void stop() {
+    stopMotor(in1, in2, enA);
+    stopMotor(in3, in4, enB);
+}
