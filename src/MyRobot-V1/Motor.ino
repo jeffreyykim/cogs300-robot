@@ -1,16 +1,41 @@
 /**
  * @file Motor.ino
- * @brief Simple H-bridge motor control helpers.
+ * @brief H-bridge motor control with speed and direction support.
  *
- * Provides a minimal interface for driving a DC motor using
- * digital GPIO pins (e.g. Arduino-style platforms).
+ * Provides an interface for driving two DC motors using PWM for speed control
+ * and direction pins for forward/backward control. Includes high-level functions
+ * for robot movement: forward, backward, left turn, right turn, and in-place turn.
  *
- * The motor direction is controlled via two input pins,
- * while a separate enable pin turns the motor on or off.
+ * Motor A: enA (PWM pin 9), in1 (pin 8), in2 (pin 7)
+ * Motor B: enB (PWM pin 3), in3 (pin 6), in4 (pin 5)
  *
  * @author Paul Bucci
  * @date 2026
  */
+
+// Motor A pins (left motor)
+int enA = 9;   // Enable pin for Motor A — must be a PWM-capable pin
+int in1 = 8;   // Direction control pin 1 for Motor A
+int in2 = 7;   // Direction control pin 2 for Motor A
+
+// Motor B pins (right motor)
+int enB = 3;   // Enable pin for Motor B — must be a PWM-capable pin
+int in3 = 6;   // Direction control pin 1 for Motor B
+int in4 = 5;   // Direction control pin 2 for Motor B
+
+/**
+ * @brief Initialize motor control pins.
+ */
+void initializeMotors() {
+    // Set motor control pins as outputs
+    pinMode(enA, OUTPUT);
+    pinMode(in1, OUTPUT);
+    pinMode(in2, OUTPUT);
+    
+    pinMode(enB, OUTPUT);
+    pinMode(in3, OUTPUT);
+    pinMode(in4, OUTPUT);
+}
 
 
 /**
