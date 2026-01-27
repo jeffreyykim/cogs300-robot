@@ -78,3 +78,36 @@ void stop() {
     stopMotor(in1, in2, enA);
     stopMotor(in3, in4, enB);
 }
+
+/**
+ * @brief Turn the robot left while driving forward.
+ */
+void turnLeft(int baseSpeed = 150, int speedBoost = 50) {
+    int leftSpeed = baseSpeed;
+    int rightSpeed = baseSpeed + speedBoost;
+    driveMotor(in1, in2, enA, leftSpeed, true);
+    driveMotor(in3, in4, enB, rightSpeed, true);
+}
+
+/**
+ * @brief Turn the robot right while driving forward.
+ */
+void turnRight(int baseSpeed = 150, int speedBoost = 50) {
+    int leftSpeed = baseSpeed + speedBoost;
+    int rightSpeed = baseSpeed;
+    driveMotor(in1, in2, enA, leftSpeed, true);
+    driveMotor(in3, in4, enB, rightSpeed, true);
+}
+
+/**
+ * @brief Turn the robot in place (spin).
+ */
+void turnInPlace(int speed = 180, bool clockwise = true) {
+    if (clockwise) {
+        driveMotor(in1, in2, enA, speed, true);
+        driveMotor(in3, in4, enB, speed, false);
+    } else {
+        driveMotor(in1, in2, enA, speed, false);
+        driveMotor(in3, in4, enB, speed, true);
+    }
+}
