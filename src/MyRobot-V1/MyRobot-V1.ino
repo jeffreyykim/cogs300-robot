@@ -26,17 +26,23 @@ void setup() {
 }
 
 void loop() {
-    // put your main code here, to run repeatedly:
-
-    // Drive for 1 second
-    logInfo(Serial, "Driving");
-    drive(in1, in2, enA);
+    // Drive forward for 1 second
+    logInfo(Serial, "Moving forward");
+    forward(200);
     delay(1000);
 
     // Stop for 1 second
     logInfo(Serial, "Stopping");
-    stop(in1, in2, enA);
+    stop();
     delay(1000);
 
-    // TODO: add your own driving functions here
+    // Drive backward for 1 second
+    logInfo(Serial, "Moving backward");
+    backward(200);
+    delay(1000);
+
+    // Stop for 1 second
+    logInfo(Serial, "Stopping");
+    stop();
+    delay(1000);
 }
