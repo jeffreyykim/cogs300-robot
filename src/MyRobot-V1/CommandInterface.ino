@@ -35,10 +35,17 @@ void testMotorABackward(int speed);
 void testMotorBForward(int speed);
 void testMotorBBackward(int speed);
 
+// Encoder functions (from Encoder.ino)
+void resetEncoders();
+void printEncoderTelemetry();
+long getEncoderA();
+long getEncoderB();
+
 // -------- settings --------
 static int g_defaultSpeed = 200;
 static int g_baseSpeed = 150;
 static int g_boost = 50;
+static bool g_telemetryEnabled = false;  // CSV telemetry streaming
 
 // -------- line buffer --------
 static String g_line;
@@ -57,6 +64,12 @@ static void tickTimedStop() {
     stop();
     g_actionRunning = false;
     logInfo(Serial, "DONE (timed action finished)");
+  }
+}
+
+static void tickTelemetry() {
+  if (g_telemetryEnabled) {
+    printEncoderTelemetry();  // prints CSV: t_ms,encoderA,encoderB
   }
 }
 
@@ -113,6 +126,9 @@ static void printHelp() {
   Serial.println(F("  TEST MB_FWD [speed]        (test Motor B forward)"));
   Serial.println(F("  TEST MB_REV [speed]        (test Motor B backward)"));
   Serial.println(F("  LOOP <n> TEST ALL"));
+  Serial.println(F("  TELEMETRY ON|OFF           (stream encoder CSV data)"));
+  Serial.println(F("  ENCODERS                   (show encoder counts)"));
+  Serial.println(F("  RESET_ENC                  (reset encoder counts)"));
   Serial.println();
   Serial.println(F("Serial Monitor: 9600 baud, Newline line ending"));
 }
@@ -336,12 +352,44 @@ static void handleCommand(String cmd) {
     return;
   }
 
+  if (c1 == "TELEMETRY") {
+    String c2 = nextWord(u, i);
+    if (c2 == "ON") {
+      g_telemetryEnabled = true;
+      Serial.println("t_ms,encoderA,encoderB");  // CSV header
+      logInfo(Serial, "Telemetry ON (CSV streaming)");
+      return;
+    }
+    if (c2 == "OFF") {
+      g_telemetryEnabled = false;
+      logInfo(Serial, "Telemetry OFF");
+      return;
+    }
+    logError(Serial, "Usage: TELEMETRY ON|OFF");
+    return;
+  }
+
+  if (c1 == "ENCODERS") {
+    Serial.print("Encoder A (left): ");
+    Serial.print(getEncoderA());
+    Serial.print(" | Encoder B (right): ");
+    Serial.println(getEncoderB());
+    return;
+  }
+
+  if (c1 == "RESET_ENC") {
+    resetEncoders();
+    logInfo(Serial, "OK encoder counts reset");
+    return;
+  }
+
   logError(Serial, "Unknown command. Type HELP.");
 }
 
 // -------- called from main loop --------
 void serialInterfaceTick() {
   tickTimedStop();
+  tickTelemetry();  // stream encoder data if enabled
 
   while (Serial.available()) {
     char c = (char)Serial.read();
