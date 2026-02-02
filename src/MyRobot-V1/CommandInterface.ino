@@ -30,6 +30,10 @@ void stop();
 void turnLeft(int baseSpeed, int speedBoost);
 void turnRight(int baseSpeed, int speedBoost);
 void turnInPlace(int speed, bool clockwise);
+void testMotorAForward(int speed);
+void testMotorABackward(int speed);
+void testMotorBForward(int speed);
+void testMotorBBackward(int speed);
 
 // -------- settings --------
 static int g_defaultSpeed = 200;
@@ -104,6 +108,10 @@ static void printHelp() {
   Serial.println(F("  SPINL <ms> [speed]"));
   Serial.println(F("  SPINR <ms> [speed]"));
   Serial.println(F("  TEST ALL"));
+  Serial.println(F("  TEST MA_FWD [speed]        (test Motor A forward)"));
+  Serial.println(F("  TEST MA_REV [speed]        (test Motor A backward)"));
+  Serial.println(F("  TEST MB_FWD [speed]        (test Motor B forward)"));
+  Serial.println(F("  TEST MB_REV [speed]        (test Motor B backward)"));
   Serial.println(F("  LOOP <n> TEST ALL"));
   Serial.println();
   Serial.println(F("Serial Monitor: 9600 baud, Newline line ending"));
@@ -276,7 +284,38 @@ static void handleCommand(String cmd) {
   if (c1 == "TEST") {
     String c2 = nextWord(u, i);
     if (c2 == "ALL") { testAllOnce(); return; }
-    logError(Serial, "Usage: TEST ALL");
+    
+    // Individual motor tests
+    if (c2 == "MA_FWD") {
+      int sp = g_defaultSpeed;
+      nextInt(u, i, sp);
+      sp = clamp255(sp);
+      testMotorAForward(sp);
+      return;
+    }
+    if (c2 == "MA_REV") {
+      int sp = g_defaultSpeed;
+      nextInt(u, i, sp);
+      sp = clamp255(sp);
+      testMotorABackward(sp);
+      return;
+    }
+    if (c2 == "MB_FWD") {
+      int sp = g_defaultSpeed;
+      nextInt(u, i, sp);
+      sp = clamp255(sp);
+      testMotorBForward(sp);
+      return;
+    }
+    if (c2 == "MB_REV") {
+      int sp = g_defaultSpeed;
+      nextInt(u, i, sp);
+      sp = clamp255(sp);
+      testMotorBBackward(sp);
+      return;
+    }
+    
+    logError(Serial, "Usage: TEST ALL or TEST MA_FWD/MA_REV/MB_FWD/MB_REV [speed]");
     return;
   }
 

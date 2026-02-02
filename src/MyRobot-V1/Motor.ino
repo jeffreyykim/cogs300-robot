@@ -17,7 +17,7 @@ int in3 = 6;
 int in4 = 5;
 
 // Optional tuning
-int MIN_SPEED = 80; // set to 0 if you don't want a minimum
+int MIN_SPEED = 0; // disabled to allow low-speed testing
 
 // ---- helpers ----
 int clampSpeed(int s) {
@@ -86,6 +86,10 @@ void stopMotor(int in1, int in2, int en) {
  * @brief Drive the robot forward.
  */
 void forward(int speed = 200) {
+  Serial.print("FWD: Motor A (left) @ ");
+  Serial.print(speed);
+  Serial.print(", Motor B (right) @ ");
+  Serial.println(speed);
   driveMotor(in1, in2, enA, speed, true);
   driveMotor(in3, in4, enB, speed, true);
 }
@@ -94,6 +98,10 @@ void forward(int speed = 200) {
  * @brief Drive the robot backward.
  */
 void backward(int speed = 200) {
+  Serial.print("REV: Motor A (left) @ ");
+  Serial.print(speed);
+  Serial.print(", Motor B (right) @ ");
+  Serial.println(speed);
   driveMotor(in1, in2, enA, speed, false);
   driveMotor(in3, in4, enB, speed, false);
 }
@@ -138,4 +146,36 @@ void turnInPlace(int speed = 180, bool clockwise = true) {
     driveMotor(in1, in2, enA, speed, false);
     driveMotor(in3, in4, enB, speed, true);
   }
+}
+
+/**
+ * @brief Test Motor A (left) individually - forward
+ */
+void testMotorAForward(int speed = 150) {
+  Serial.println("Testing Motor A (left) FORWARD");
+  driveMotor(in1, in2, enA, speed, true);
+}
+
+/**
+ * @brief Test Motor A (left) individually - backward
+ */
+void testMotorABackward(int speed = 150) {
+  Serial.println("Testing Motor A (left) BACKWARD");
+  driveMotor(in1, in2, enA, speed, false);
+}
+
+/**
+ * @brief Test Motor B (right) individually - forward
+ */
+void testMotorBForward(int speed = 150) {
+  Serial.println("Testing Motor B (right) FORWARD");
+  driveMotor(in3, in4, enB, speed, true);
+}
+
+/**
+ * @brief Test Motor B (right) individually - backward
+ */
+void testMotorBBackward(int speed = 150) {
+  Serial.println("Testing Motor B (right) BACKWARD");
+  driveMotor(in3, in4, enB, speed, false);
 }
