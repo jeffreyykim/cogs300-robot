@@ -1,4 +1,4 @@
-#include <Arduino.h>
+
 
 // Forward declarations for motor control functions
 void initializeMotors();
@@ -13,20 +13,27 @@ void turnInPlace(int speed, bool clockwise);
 void initializeEncoders();
 void updateEncoders();
 
+
 // From Serial.ino
 void logInfo(Stream& out, const char* msg);
 
 // From CommandInterface.ino
 void serialInterfaceTick();
 
+// From WiFiAP.ino
+void initializeWifiAp();
+void wifiTick();
+
 void setup() {
   Serial.begin(9600);
+  delay(2000);  // Give Serial time to initialize
   initializeMotors();
   initializeEncoders();
-  logInfo(Serial, "Robot ready. Type HELP in Serial Monitor.");
+  initializeWifiAp();
 }
 
 void loop() {
-  updateEncoders();  // read encoder values every loop
-  serialInterfaceTick();
+  updateEncoders();        // read encoder values every loop
+  serialInterfaceTick();   // handle serial commands
+  wifiTick();              // handle WiFi HTTP requests
 }

@@ -386,6 +386,11 @@ static void handleCommand(String cmd) {
   logError(Serial, "Unknown command. Type HELP.");
 }
 
+// Exposed wrapper for other modules (e.g., WiFi AP control)
+void commandInterfaceHandleCommand(const String& cmd) {
+  handleCommand(cmd);
+}
+
 // -------- called from main loop --------
 void serialInterfaceTick() {
   tickTimedStop();
