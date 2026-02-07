@@ -34,12 +34,28 @@ void testMotorAForward(int speed);
 void testMotorABackward(int speed);
 void testMotorBForward(int speed);
 void testMotorBBackward(int speed);
+void setMotorTrimLeft(int trim);
+void setMotorTrimRight(int trim);
+int getMotorTrimLeft();
+int getMotorTrimRight();
 
 // Encoder functions (from Encoder.ino)
 void resetEncoders();
 void printEncoderTelemetry();
 long getEncoderA();
 long getEncoderB();
+
+// Photocell functions (from Photocell.ino)
+void setPhotocellEnabled(bool enabled);
+bool isPhotocellEnabled();
+void setPhotocellThreshold(int threshold);
+int getPhotocellThreshold();
+bool isPhotocellDigitalMode();
+bool isPhotocellActiveLow();
+void setPhotocellDriveSpeed(int speed);
+int getPhotocellDriveSpeed();
+int getPhotocellMeasurement();
+int getPhotocellState();
 
 // -------- settings --------
 static int g_defaultSpeed = 200;
@@ -113,6 +129,8 @@ static void printHelp() {
   Serial.println(F("  PING"));
   Serial.println(F("  STOP"));
   Serial.println(F("  SPEED <0-255>              (sets default motor speed)"));
+  Serial.println(F("  TRIM L|R <delta>           (adjust motor trim, +/-)"));
+  Serial.println(F("  TRIM SHOW                  (show current trim)"));
   Serial.println(F("  TURNSET <base> <boost>     (sets default turn params)"));
   Serial.println(F("  FWD <ms> [speed]"));
   Serial.println(F("  REV <ms> [speed]"));
@@ -129,6 +147,10 @@ static void printHelp() {
   Serial.println(F("  TELEMETRY ON|OFF           (stream encoder CSV data)"));
   Serial.println(F("  ENCODERS                   (show encoder counts)"));
   Serial.println(F("  RESET_ENC                  (reset encoder counts)"));
+  Serial.println(F("  PHOTO ON|OFF               (enable/disable photocell behavior)"));
+  Serial.println(F("  PHOTO THRESH <0-1023>      (set threshold; analog only)"));
+  Serial.println(F("  PHOTO SPEED <0-255>        (set photocell drive speed)"));
+  Serial.println(F("  PHOTO READ                 (print photocell reading/state)"));
   Serial.println();
   Serial.println(F("Serial Monitor: 9600 baud, Newline line ending"));
 }
@@ -227,6 +249,34 @@ static void handleCommand(String cmd) {
     return;
   }
 
+  if (c1 == "TRIM") {
+    String c2 = nextWord(u, i);
+    if (c2 == "SHOW") {
+      Serial.print(F("trimLeft="));
+      Serial.print(getMotorTrimLeft());
+      Serial.print(F(" trimRight="));
+      Serial.println(getMotorTrimRight());
+      return;
+    }
+    if (c2 == "L" || c2 == "R") {
+      int d;
+      if (!nextInt(u, i, d)) { logError(Serial, "TRIM L|R needs <delta>"); return; }
+      if (c2 == "L") {
+        setMotorTrimLeft(d);
+        Serial.print(F("trimLeft="));
+        Serial.println(getMotorTrimLeft());
+      } else {
+        setMotorTrimRight(d);
+        Serial.print(F("trimRight="));
+        Serial.println(getMotorTrimRight());
+      }
+      logInfo(Serial, "OK trim updated");
+      return;
+    }
+    logError(Serial, "Usage: TRIM L|R <delta> or TRIM SHOW");
+    return;
+  }
+
   // Movement: <ms> [speed/base] [boost]
   if (c1 == "FWD" || c1 == "REV" || c1 == "LEFT" || c1 == "RIGHT" || c1 == "SPINL" || c1 == "SPINR") {
     int ms;
@@ -281,7 +331,7 @@ static void handleCommand(String cmd) {
       nextInt(u, i, sp);
       sp = clamp255(sp);
       logInfo(Serial, "OK SPINL");
-      turnInPlace(sp, false); // CCW
+      turnInPlace(sp, true); // CW
       startTimed((unsigned long)ms);
       return;
     }
@@ -291,7 +341,7 @@ static void handleCommand(String cmd) {
       nextInt(u, i, sp);
       sp = clamp255(sp);
       logInfo(Serial, "OK SPINR");
-      turnInPlace(sp, true); // CW
+      turnInPlace(sp, false); // CCW
       startTimed((unsigned long)ms);
       return;
     }
@@ -380,6 +430,62 @@ static void handleCommand(String cmd) {
   if (c1 == "RESET_ENC") {
     resetEncoders();
     logInfo(Serial, "OK encoder counts reset");
+    return;
+  }
+
+  if (c1 == "PHOTO") {
+    String c2 = nextWord(u, i);
+    if (c2 == "ON") {
+      setPhotocellEnabled(true);
+      logInfo(Serial, "Photocell ON");
+      return;
+    }
+    if (c2 == "OFF") {
+      setPhotocellEnabled(false);
+      logInfo(Serial, "Photocell OFF");
+      return;
+    }
+    if (c2 == "THRESH") {
+      int t;
+      if (!nextInt(u, i, t)) { logError(Serial, "PHOTO THRESH needs <0-1023>"); return; }
+      if (isPhotocellDigitalMode()) {
+        logInfo(Serial, "Photocell is in digital mode; threshold ignored");
+      } else {
+        setPhotocellThreshold(t);
+        logInfo(Serial, "OK photocell threshold set");
+        Serial.print(F("threshold="));
+        Serial.println(getPhotocellThreshold());
+      }
+      return;
+    }
+    if (c2 == "SPEED") {
+      int sp;
+      if (!nextInt(u, i, sp)) { logError(Serial, "PHOTO SPEED needs <0-255>"); return; }
+      setPhotocellDriveSpeed(sp);
+      logInfo(Serial, "OK photocell speed set");
+      Serial.print(F("photoSpeed="));
+      Serial.println(getPhotocellDriveSpeed());
+      return;
+    }
+    if (c2 == "READ") {
+      Serial.print(F("photoEnabled="));
+      Serial.print(isPhotocellEnabled() ? "1" : "0");
+      Serial.print(F(" mode="));
+      Serial.print(isPhotocellDigitalMode() ? "digital" : "analog");
+      Serial.print(F(" measurement="));
+      Serial.print(getPhotocellMeasurement());
+      if (isPhotocellDigitalMode()) {
+        Serial.print(F(" activeLow="));
+        Serial.print(isPhotocellActiveLow() ? "1" : "0");
+      } else {
+        Serial.print(F(" threshold="));
+        Serial.print(getPhotocellThreshold());
+      }
+      Serial.print(F(" state="));
+      Serial.println(getPhotocellState());
+      return;
+    }
+    logError(Serial, "Usage: PHOTO ON|OFF|THRESH <0-1023>|SPEED <0-255>|READ");
     return;
   }
 

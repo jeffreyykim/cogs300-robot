@@ -13,6 +13,10 @@ void turnInPlace(int speed, bool clockwise);
 void initializeEncoders();
 void updateEncoders();
 
+// From Photocell.ino
+void initializePhotocell();
+void photocellTick();
+
 
 // From Serial.ino
 void logInfo(Stream& out, const char* msg);
@@ -29,11 +33,13 @@ void setup() {
   delay(2000);  // Give Serial time to initialize
   initializeMotors();
   initializeEncoders();
+  initializePhotocell();
   initializeWifiAp();
 }
 
 void loop() {
   updateEncoders();        // read encoder values every loop
   serialInterfaceTick();   // handle serial commands
+  photocellTick();         // photocell state machine (if enabled)
   wifiTick();              // handle WiFi HTTP requests
 }

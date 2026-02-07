@@ -18,6 +18,8 @@ int in4 = 5;
 
 // Optional tuning
 int MIN_SPEED = 0; // disabled to allow low-speed testing
+static int g_trimLeft = 0;
+static int g_trimRight = 0;
 
 // ---- helpers ----
 int clampSpeed(int s) {
@@ -30,6 +32,30 @@ int applyMinSpeed(int s) {
   s = clampSpeed(s);
   if (s > 0 && s < MIN_SPEED) return MIN_SPEED;
   return s;
+}
+
+int applyTrimLeft(int s) {
+  return applyMinSpeed(s + g_trimLeft);
+}
+
+int applyTrimRight(int s) {
+  return applyMinSpeed(s + g_trimRight);
+}
+
+void setMotorTrimLeft(int trim) {
+  g_trimLeft = trim;
+}
+
+void setMotorTrimRight(int trim) {
+  g_trimRight = trim;
+}
+
+int getMotorTrimLeft() {
+  return g_trimLeft;
+}
+
+int getMotorTrimRight() {
+  return g_trimRight;
 }
 
 /**
@@ -87,11 +113,11 @@ void stopMotor(int in1, int in2, int en) {
  */
 void forward(int speed = 200) {
   Serial.print("FWD: Motor A (left) @ ");
-  Serial.print(speed);
+  Serial.print(applyTrimLeft(speed));
   Serial.print(", Motor B (right) @ ");
-  Serial.println(speed);
-  driveMotor(in1, in2, enA, speed, true);
-  driveMotor(in3, in4, enB, speed, true);
+  Serial.println(applyTrimRight(speed));
+  driveMotor(in1, in2, enA, applyTrimLeft(speed), true);
+  driveMotor(in3, in4, enB, applyTrimRight(speed), true);
 }
 
 /**
@@ -99,11 +125,11 @@ void forward(int speed = 200) {
  */
 void backward(int speed = 200) {
   Serial.print("REV: Motor A (left) @ ");
-  Serial.print(speed);
+  Serial.print(applyTrimLeft(speed));
   Serial.print(", Motor B (right) @ ");
-  Serial.println(speed);
-  driveMotor(in1, in2, enA, speed, false);
-  driveMotor(in3, in4, enB, speed, false);
+  Serial.println(applyTrimRight(speed));
+  driveMotor(in1, in2, enA, applyTrimLeft(speed), false);
+  driveMotor(in3, in4, enB, applyTrimRight(speed), false);
 }
 
 /**
@@ -120,8 +146,8 @@ void stop() {
 void turnLeft(int baseSpeed = 150, int speedBoost = 50) {
   int leftSpeed  = clampSpeed(baseSpeed);
   int rightSpeed = clampSpeed(baseSpeed + speedBoost);
-  driveMotor(in1, in2, enA, leftSpeed, true);
-  driveMotor(in3, in4, enB, rightSpeed, true);
+  driveMotor(in1, in2, enA, applyTrimLeft(leftSpeed), true);
+  driveMotor(in3, in4, enB, applyTrimRight(rightSpeed), true);
 }
 
 /**
@@ -130,8 +156,8 @@ void turnLeft(int baseSpeed = 150, int speedBoost = 50) {
 void turnRight(int baseSpeed = 150, int speedBoost = 50) {
   int leftSpeed  = clampSpeed(baseSpeed + speedBoost);
   int rightSpeed = clampSpeed(baseSpeed);
-  driveMotor(in1, in2, enA, leftSpeed, true);
-  driveMotor(in3, in4, enB, rightSpeed, true);
+  driveMotor(in1, in2, enA, applyTrimLeft(leftSpeed), true);
+  driveMotor(in3, in4, enB, applyTrimRight(rightSpeed), true);
 }
 
 /**
@@ -140,11 +166,11 @@ void turnRight(int baseSpeed = 150, int speedBoost = 50) {
 void turnInPlace(int speed = 180, bool clockwise = true) {
   speed = clampSpeed(speed);
   if (clockwise) {
-    driveMotor(in1, in2, enA, speed, true);
-    driveMotor(in3, in4, enB, speed, false);
+    driveMotor(in1, in2, enA, applyTrimLeft(speed), true);
+    driveMotor(in3, in4, enB, applyTrimRight(speed), false);
   } else {
-    driveMotor(in1, in2, enA, speed, false);
-    driveMotor(in3, in4, enB, speed, true);
+    driveMotor(in1, in2, enA, applyTrimLeft(speed), false);
+    driveMotor(in3, in4, enB, applyTrimRight(speed), true);
   }
 }
 
@@ -153,7 +179,7 @@ void turnInPlace(int speed = 180, bool clockwise = true) {
  */
 void testMotorAForward(int speed = 150) {
   Serial.println("Testing Motor A (left) FORWARD");
-  driveMotor(in1, in2, enA, speed, true);
+  driveMotor(in1, in2, enA, applyTrimLeft(speed), true);
 }
 
 /**
@@ -161,7 +187,7 @@ void testMotorAForward(int speed = 150) {
  */
 void testMotorABackward(int speed = 150) {
   Serial.println("Testing Motor A (left) BACKWARD");
-  driveMotor(in1, in2, enA, speed, false);
+  driveMotor(in1, in2, enA, applyTrimLeft(speed), false);
 }
 
 /**
@@ -169,7 +195,7 @@ void testMotorABackward(int speed = 150) {
  */
 void testMotorBForward(int speed = 150) {
   Serial.println("Testing Motor B (right) FORWARD");
-  driveMotor(in3, in4, enB, speed, true);
+  driveMotor(in3, in4, enB, applyTrimRight(speed), true);
 }
 
 /**
@@ -177,5 +203,5 @@ void testMotorBForward(int speed = 150) {
  */
 void testMotorBBackward(int speed = 150) {
   Serial.println("Testing Motor B (right) BACKWARD");
-  driveMotor(in3, in4, enB, speed, false);
+  driveMotor(in3, in4, enB, applyTrimRight(speed), false);
 }
