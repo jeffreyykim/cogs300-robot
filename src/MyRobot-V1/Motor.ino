@@ -3,16 +3,16 @@
  * @brief H-bridge motor control with PWM speed + direction support.
  *
  * Motor A: enA (PWM pin 9), in1 (pin 8), in2 (pin 7)
- * Motor B: enB (PWM pin 3), in3 (pin 6), in4 (pin 5)
+ * Motor B: enB (PWM pin 10), in3 (pin 6), in4 (pin 5)
  */
 
-// Motor A pins (left motor)
+// Motor A pins (RIGHT motor — physically on the right side)
 int enA = 9;   // PWM
 int in1 = 8;
 int in2 = 7;
 
-// Motor B pins (right motor)
-int enB = 3;   // PWM
+// Motor B pins (LEFT motor — physically on the left side)
+int enB = 10;   // PWM
 int in3 = 6;
 int in4 = 5;
 
@@ -112,24 +112,16 @@ void stopMotor(int in1, int in2, int en) {
  * @brief Drive the robot forward.
  */
 void forward(int speed = 200) {
-  Serial.print("FWD: Motor A (left) @ ");
-  Serial.print(applyTrimLeft(speed));
-  Serial.print(", Motor B (right) @ ");
-  Serial.println(applyTrimRight(speed));
-  driveMotor(in1, in2, enA, applyTrimLeft(speed), true);
-  driveMotor(in3, in4, enB, applyTrimRight(speed), true);
+  driveMotor(in3, in4, enB, applyTrimLeft(speed),  true);  // Motor B = left
+  driveMotor(in1, in2, enA, applyTrimRight(speed), true);  // Motor A = right
 }
 
 /**
  * @brief Drive the robot backward.
  */
 void backward(int speed = 200) {
-  Serial.print("REV: Motor A (left) @ ");
-  Serial.print(applyTrimLeft(speed));
-  Serial.print(", Motor B (right) @ ");
-  Serial.println(applyTrimRight(speed));
-  driveMotor(in1, in2, enA, applyTrimLeft(speed), false);
-  driveMotor(in3, in4, enB, applyTrimRight(speed), false);
+  driveMotor(in3, in4, enB, applyTrimLeft(speed),  false);  // Motor B = left
+  driveMotor(in1, in2, enA, applyTrimRight(speed), false);  // Motor A = right
 }
 
 /**
@@ -146,8 +138,8 @@ void stop() {
 void turnLeft(int baseSpeed = 150, int speedBoost = 50) {
   int leftSpeed  = clampSpeed(baseSpeed);
   int rightSpeed = clampSpeed(baseSpeed + speedBoost);
-  driveMotor(in1, in2, enA, applyTrimLeft(leftSpeed), true);
-  driveMotor(in3, in4, enB, applyTrimRight(rightSpeed), true);
+  driveMotor(in3, in4, enB, applyTrimLeft(leftSpeed),   true);  // Motor B = left  (slow)
+  driveMotor(in1, in2, enA, applyTrimRight(rightSpeed), true);  // Motor A = right (fast)
 }
 
 /**
@@ -156,8 +148,8 @@ void turnLeft(int baseSpeed = 150, int speedBoost = 50) {
 void turnRight(int baseSpeed = 150, int speedBoost = 50) {
   int leftSpeed  = clampSpeed(baseSpeed + speedBoost);
   int rightSpeed = clampSpeed(baseSpeed);
-  driveMotor(in1, in2, enA, applyTrimLeft(leftSpeed), true);
-  driveMotor(in3, in4, enB, applyTrimRight(rightSpeed), true);
+  driveMotor(in3, in4, enB, applyTrimLeft(leftSpeed),   true);  // Motor B = left  (fast)
+  driveMotor(in1, in2, enA, applyTrimRight(rightSpeed), true);  // Motor A = right (slow)
 }
 
 /**
@@ -166,11 +158,13 @@ void turnRight(int baseSpeed = 150, int speedBoost = 50) {
 void turnInPlace(int speed = 180, bool clockwise = true) {
   speed = clampSpeed(speed);
   if (clockwise) {
-    driveMotor(in1, in2, enA, applyTrimLeft(speed), true);
-    driveMotor(in3, in4, enB, applyTrimRight(speed), false);
+    // CW = left forward, right backward
+    driveMotor(in3, in4, enB, applyTrimLeft(speed),  true);   // Motor B = left  fwd
+    driveMotor(in1, in2, enA, applyTrimRight(speed), false);  // Motor A = right rev
   } else {
-    driveMotor(in1, in2, enA, applyTrimLeft(speed), false);
-    driveMotor(in3, in4, enB, applyTrimRight(speed), true);
+    // CCW = left backward, right forward
+    driveMotor(in3, in4, enB, applyTrimLeft(speed),  false);  // Motor B = left  rev
+    driveMotor(in1, in2, enA, applyTrimRight(speed), true);   // Motor A = right fwd
   }
 }
 
@@ -204,4 +198,16 @@ void testMotorBForward(int speed = 150) {
 void testMotorBBackward(int speed = 150) {
   Serial.println("Testing Motor B (right) BACKWARD");
   driveMotor(in3, in4, enB, applyTrimRight(speed), false);
+}
+
+/**
+ * @brief Set individual motor speeds for differential drive.
+ *        Positive values = forward, negative = backward. Range -255 to 255.
+ *        Used by the wall-follow / follow-me P-controller.
+ */
+void setMotorSpeeds(int leftSpeed, int rightSpeed) {
+  bool leftFwd  = (leftSpeed  >= 0);
+  bool rightFwd = (rightSpeed >= 0);
+  driveMotor(in3, in4, enB, applyTrimLeft(abs(leftSpeed)),   leftFwd);  // Motor B = left
+  driveMotor(in1, in2, enA, applyTrimRight(abs(rightSpeed)), rightFwd); // Motor A = right
 }

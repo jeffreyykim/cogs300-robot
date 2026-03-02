@@ -13,10 +13,16 @@ void turnInPlace(int speed, bool clockwise);
 void initializeEncoders();
 void updateEncoders();
 
+// From Ultrasonic.ino
+void initializeUltrasonic();
+void sonarTick();
+
 // From Photocell.ino
 void initializePhotocell();
 void photocellTick();
 
+// From WallFollow.ino
+void wallFollowTick();
 
 // From Serial.ino
 void logInfo(Stream& out, const char* msg);
@@ -28,18 +34,27 @@ void serialInterfaceTick();
 void initializeWifiAp();
 void wifiTick();
 
+// From ObjectDetect.ino
+void objectDetectInit();
+void objectDetectTick();
+
 void setup() {
   Serial.begin(9600);
   delay(2000);  // Give Serial time to initialize
   initializeMotors();
   initializeEncoders();
+  initializeUltrasonic();
   initializePhotocell();
   initializeWifiAp();
+  objectDetectInit();
 }
 
 void loop() {
   updateEncoders();        // read encoder values every loop
+  sonarTick();             // stream sonar CSV if enabled
+  photocellTick();         // photocell state machine
+  wallFollowTick();        // P-controller: follow-me / wall-follow
+  objectDetectTick();      // Lab 07: sweep + Bayes object tracking
   serialInterfaceTick();   // handle serial commands
-  photocellTick();         // photocell state machine (if enabled)
   wifiTick();              // handle WiFi HTTP requests
 }

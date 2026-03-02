@@ -15,6 +15,13 @@
  *   SPINR 500
  *   TEST ALL
  *   LOOP 5 TEST ALL
+ *   SONAR READ
+ *   SONAR TELEM ON
+ *   FOLLOW ON
+ *   FOLLOW SET 25
+ *   WALLFOLLOW ON
+ *   WALLFOLLOW SIDE L
+ *   WALLFOLLOW SET 20
  */
 
 #include <Arduino.h>
@@ -45,17 +52,61 @@ void printEncoderTelemetry();
 long getEncoderA();
 long getEncoderB();
 
+// Ultrasonic functions (from Ultrasonic.ino)
+float getFrontDistanceCm();
+float getSideDistanceCm();
+void  printUltrasonicTelemetry();
+void  setSonarTelemetryEnabled(bool en);
+bool  isSonarTelemetryEnabled();
+
 // Photocell functions (from Photocell.ino)
-void setPhotocellEnabled(bool enabled);
+void initializePhotocell();
+int  getPhotocellMeasurement();
+int  getPhotocellThreshold();
+void setPhotocellThreshold(int t);
+int  getPhotocellState();
 bool isPhotocellEnabled();
-void setPhotocellThreshold(int threshold);
-int getPhotocellThreshold();
-bool isPhotocellDigitalMode();
-bool isPhotocellActiveLow();
-void setPhotocellDriveSpeed(int speed);
-int getPhotocellDriveSpeed();
-int getPhotocellMeasurement();
-int getPhotocellState();
+void setPhotocellEnabled(bool en);
+bool isLineFollowEnabled();
+void setLineFollowEnabled(bool en);
+
+// Wall-follow functions (from WallFollow.ino)
+void  setFollowMeEnabled(bool en);
+void  setWallFollowEnabled(bool en);
+bool  isFollowMeEnabled();
+bool  isWallFollowEnabled();
+void  setWallFollowSetPoint(float cm);
+float getWallFollowSetPoint();
+void  setWallFollowKp(float kp);
+float getWallFollowKp();
+void  setWallFollowBaseSpeed(int sp);
+int   getWallFollowBaseSpeed();
+void  setWallOnLeft(bool left);
+bool  isWallOnLeft();
+void  setDriveAndAvoidEnabled(bool en);
+bool  isDriveAndAvoidEnabled();
+void  setObstacleThreshold(float cm);
+float getObstacleThreshold();
+void  setObstacleTurnMs(int ms);
+int   getObstacleTurnMs();
+
+// Object-detect functions (from ObjectDetect.ino)
+void  setObjectDetectEnabled(bool en);
+bool  isObjectDetectEnabled();
+void  setOdSpinSpeed(int sp);
+int   getOdSpinSpeed();
+void  setOdMsPerStep(int ms);
+int   getOdMsPerStep();
+void  setOdSettleMs(int ms);
+int   getOdSettleMs();
+void  setOdDriveSpeed(int sp);
+int   getOdDriveSpeed();
+void  setOdDriveMs(int ms);
+int   getOdDriveMs();
+void  setOdObjectMaxCm(float c);
+float getOdObjectMaxCm();
+void  odPrintMap();
+void  odPrintStatus();
 
 // -------- settings --------
 static int g_defaultSpeed = 200;
@@ -147,10 +198,33 @@ static void printHelp() {
   Serial.println(F("  TELEMETRY ON|OFF           (stream encoder CSV data)"));
   Serial.println(F("  ENCODERS                   (show encoder counts)"));
   Serial.println(F("  RESET_ENC                  (reset encoder counts)"));
-  Serial.println(F("  PHOTO ON|OFF               (enable/disable photocell behavior)"));
-  Serial.println(F("  PHOTO THRESH <0-1023>      (set threshold; analog only)"));
-  Serial.println(F("  PHOTO SPEED <0-255>        (set photocell drive speed)"));
-  Serial.println(F("  PHOTO READ                 (print photocell reading/state)"));
+  Serial.println(F("  SONAR READ                 (single distance reading)"));
+  Serial.println(F("  SONAR TELEM ON|OFF         (stream sonar CSV)"));
+  Serial.println(F("  FOLLOW ON|OFF              (follow-me mode, front sensor)"));
+  Serial.println(F("  FOLLOW SET <cm>            (follow-me target distance)"));
+  Serial.println(F("  FOLLOW KP <gain*10>        (P gain x10, e.g. 60 = 6.0)"));
+  Serial.println(F("  WALLFOLLOW ON|OFF          (wall-follow mode, side sensor)"));
+  Serial.println(F("  WALLFOLLOW SIDE L|R        (which side the wall is on)"));
+  Serial.println(F("  WALLFOLLOW SET <cm>        (wall distance target)"));
+  Serial.println(F("  WALLFOLLOW SPEED <0-255>   (base forward speed)"));
+  Serial.println(F("  WALLFOLLOW KP <gain*10>    (P gain x10, e.g. 60 = 6.0)"));
+  Serial.println(F("  OBSTACLE SET <cm>          (front obstacle turn threshold)"));
+  Serial.println(F("  OBSTACLE READ              (show current settings)"));
+  Serial.println(F("  OBSTACLE TURN <ms>         (spin duration per obstacle, default 300)"));
+  Serial.println(F("  AVOID ON|OFF               (drive forward, turn right on obstacle)"));
+  Serial.println(F("  PHOTO START|STOP           (arm/disarm stop-on-second-line)"));
+  Serial.println(F("  PHOTO FOLLOW ON|OFF        (line-follow mode)"));
+  Serial.println(F("  PHOTO THRESH <0-1023>      (set brightness threshold)"));
+  Serial.println(F("  PHOTO READ                 (print measurement, threshold, state)"));
+  Serial.println(F("  SCAN START|STOP            (object-detect sweep loop)"));
+  Serial.println(F("  SCAN READ                  (print depth map + Bayes probs)"));
+  Serial.println(F("  SCAN STATUS                (print all SCAN parameters)"));
+  Serial.println(F("  SCAN SPEED  <0-255>        (spin speed for sweep)"));
+  Serial.println(F("  SCAN STEP   <ms>           (ms to rotate 22.5 deg, calibrate!)"));
+  Serial.println(F("  SCAN SETTLE <ms>           (settle wait before each reading)"));
+  Serial.println(F("  SCAN DRIVE  <ms>           (drive duration per approach)"));
+  Serial.println(F("  SCAN DSPEED <0-255>        (drive speed when approaching)"));
+  Serial.println(F("  SCAN MAXCM  <cm>           (close-reading threshold)"));
   Serial.println();
   Serial.println(F("Serial Monitor: 9600 baud, Newline line ending"));
 }
@@ -433,59 +507,228 @@ static void handleCommand(String cmd) {
     return;
   }
 
-  if (c1 == "PHOTO") {
+  if (c1 == "SONAR") {
     String c2 = nextWord(u, i);
-    if (c2 == "ON") {
-      setPhotocellEnabled(true);
-      logInfo(Serial, "Photocell ON");
+    if (c2 == "READ") {
+      float front = getFrontDistanceCm();
+      float side  = getSideDistanceCm();
+      Serial.print(F("front_cm="));
+      if (front < 0) Serial.print(F("out_of_range"));
+      else           Serial.print(front);
+      Serial.print(F(" side_cm="));
+      if (side < 0) Serial.println(F("out_of_range"));
+      else          Serial.println(side);
       return;
     }
-    if (c2 == "OFF") {
+    if (c2 == "TELEM") {
+      String c3 = nextWord(u, i);
+      if (c3 == "ON")  { setSonarTelemetryEnabled(true);  logInfo(Serial, "Sonar telemetry ON");  return; }
+      if (c3 == "OFF") { setSonarTelemetryEnabled(false); logInfo(Serial, "Sonar telemetry OFF"); return; }
+    }
+    logError(Serial, "Usage: SONAR READ | SONAR TELEM ON|OFF");
+    return;
+  }
+
+  if (c1 == "FOLLOW") {
+    String c2 = nextWord(u, i);
+    if (c2 == "ON")  { setFollowMeEnabled(true);  logInfo(Serial, "Follow-me ON");  return; }
+    if (c2 == "OFF") { setFollowMeEnabled(false); logInfo(Serial, "Follow-me OFF"); return; }
+    if (c2 == "SET") {
+      int cm;
+      if (!nextInt(u, i, cm)) { logError(Serial, "FOLLOW SET needs <cm>"); return; }
+      setWallFollowSetPoint((float)cm);
+      Serial.print(F("followSetPoint=")); Serial.println(cm);
+      return;
+    }
+    if (c2 == "KP") {
+      int kp10;
+      if (!nextInt(u, i, kp10)) { logError(Serial, "FOLLOW KP needs <gain*10>"); return; }
+      setWallFollowKp(kp10 / 10.0);
+      Serial.print(F("kp=")); Serial.println(kp10 / 10.0);
+      return;
+    }
+    logError(Serial, "Usage: FOLLOW ON|OFF|SET <cm>|KP <gain*10>");
+    return;
+  }
+
+  if (c1 == "WALLFOLLOW") {
+    String c2 = nextWord(u, i);
+    if (c2 == "ON")  { setWallFollowEnabled(true);  logInfo(Serial, "Wall-follow ON");  return; }
+    if (c2 == "OFF") { setWallFollowEnabled(false); logInfo(Serial, "Wall-follow OFF"); return; }
+    if (c2 == "SIDE") {
+      String c3 = nextWord(u, i);
+      if (c3 == "L") { setWallOnLeft(true);  logInfo(Serial, "Wall side: LEFT");  return; }
+      if (c3 == "R") { setWallOnLeft(false); logInfo(Serial, "Wall side: RIGHT"); return; }
+      logError(Serial, "Usage: WALLFOLLOW SIDE L|R");
+      return;
+    }
+    if (c2 == "SET") {
+      int cm;
+      if (!nextInt(u, i, cm)) { logError(Serial, "WALLFOLLOW SET needs <cm>"); return; }
+      setWallFollowSetPoint((float)cm);
+      Serial.print(F("wallSetPoint=")); Serial.println(cm);
+      return;
+    }
+    if (c2 == "SPEED") {
+      int sp;
+      if (!nextInt(u, i, sp)) { logError(Serial, "WALLFOLLOW SPEED needs <0-255>"); return; }
+      setWallFollowBaseSpeed(clamp255(sp));
+      Serial.print(F("wallBaseSpeed=")); Serial.println(getWallFollowBaseSpeed());
+      return;
+    }
+    if (c2 == "KP") {
+      int kp10;
+      if (!nextInt(u, i, kp10)) { logError(Serial, "WALLFOLLOW KP needs <gain*10>"); return; }
+      setWallFollowKp(kp10 / 10.0);
+      Serial.print(F("kp=")); Serial.println(kp10 / 10.0);
+      return;
+    }
+    logError(Serial, "Usage: WALLFOLLOW ON|OFF|SIDE L|R|SET <cm>|SPEED <0-255>|KP <gain*10>");
+    return;
+  }
+
+  if (c1 == "OBSTACLE") {
+    String c2 = nextWord(u, i);
+    if (c2 == "READ") {
+      Serial.print(F("obstacleThreshold_cm="));
+      Serial.print(getObstacleThreshold());
+      Serial.print(F(" turnDuration_ms="));
+      Serial.println(getObstacleTurnMs());
+      return;
+    }
+    if (c2 == "SET") {
+      int cm;
+      if (!nextInt(u, i, cm)) { logError(Serial, "OBSTACLE SET needs <cm>"); return; }
+      setObstacleThreshold((float)cm);
+      Serial.print(F("obstacleThreshold_cm=")); Serial.println(cm);
+      return;
+    }
+    if (c2 == "TURN") {
+      int ms;
+      if (!nextInt(u, i, ms)) { logError(Serial, "OBSTACLE TURN needs <ms>"); return; }
+      setObstacleTurnMs(ms);
+      Serial.print(F("turnDuration_ms=")); Serial.println(ms);
+      return;
+    }
+    logError(Serial, "Usage: OBSTACLE SET <cm> | OBSTACLE TURN <ms> | OBSTACLE READ");
+    return;
+  }
+
+  if (c1 == "AVOID") {
+    String c2 = nextWord(u, i);
+    if (c2 == "ON")  { setDriveAndAvoidEnabled(true);  logInfo(Serial, "Drive-and-avoid ON");  return; }
+    if (c2 == "OFF") { setDriveAndAvoidEnabled(false); logInfo(Serial, "Drive-and-avoid OFF"); return; }
+    logError(Serial, "Usage: AVOID ON|OFF");
+    return;
+  }
+
+  if (c1 == "PHOTO") {
+    String c2 = nextWord(u, i);
+    if (c2 == "START") {
+      setPhotocellEnabled(true);
+      logInfo(Serial, "Stop-on-line armed — robot must be moving");
+      return;
+    }
+    if (c2 == "STOP") {
       setPhotocellEnabled(false);
-      logInfo(Serial, "Photocell OFF");
+      setLineFollowEnabled(false);
+      logInfo(Serial, "Photocell disarmed");
+      return;
+    }
+    if (c2 == "FOLLOW") {
+      String c3 = nextWord(u, i);
+      if (c3 == "ON")  { setLineFollowEnabled(true);  logInfo(Serial, "Line-follow ON");  return; }
+      if (c3 == "OFF") { setLineFollowEnabled(false); logInfo(Serial, "Line-follow OFF"); return; }
+      logError(Serial, "Usage: PHOTO FOLLOW ON|OFF");
       return;
     }
     if (c2 == "THRESH") {
       int t;
       if (!nextInt(u, i, t)) { logError(Serial, "PHOTO THRESH needs <0-1023>"); return; }
-      if (isPhotocellDigitalMode()) {
-        logInfo(Serial, "Photocell is in digital mode; threshold ignored");
-      } else {
-        setPhotocellThreshold(t);
-        logInfo(Serial, "OK photocell threshold set");
-        Serial.print(F("threshold="));
-        Serial.println(getPhotocellThreshold());
-      }
-      return;
-    }
-    if (c2 == "SPEED") {
-      int sp;
-      if (!nextInt(u, i, sp)) { logError(Serial, "PHOTO SPEED needs <0-255>"); return; }
-      setPhotocellDriveSpeed(sp);
-      logInfo(Serial, "OK photocell speed set");
-      Serial.print(F("photoSpeed="));
-      Serial.println(getPhotocellDriveSpeed());
+      setPhotocellThreshold(t);
+      Serial.print(F("photocellThreshold=")); Serial.println(t);
       return;
     }
     if (c2 == "READ") {
-      Serial.print(F("photoEnabled="));
-      Serial.print(isPhotocellEnabled() ? "1" : "0");
-      Serial.print(F(" mode="));
-      Serial.print(isPhotocellDigitalMode() ? "digital" : "analog");
-      Serial.print(F(" measurement="));
+      Serial.print(F("measurement="));
       Serial.print(getPhotocellMeasurement());
-      if (isPhotocellDigitalMode()) {
-        Serial.print(F(" activeLow="));
-        Serial.print(isPhotocellActiveLow() ? "1" : "0");
-      } else {
-        Serial.print(F(" threshold="));
-        Serial.print(getPhotocellThreshold());
-      }
+      Serial.print(F(" threshold="));
+      Serial.print(getPhotocellThreshold());
+      Serial.print(F(" stopOnLine="));
+      Serial.print(isPhotocellEnabled() ? 1 : 0);
+      Serial.print(F(" lineFollow="));
+      Serial.print(isLineFollowEnabled() ? 1 : 0);
       Serial.print(F(" state="));
       Serial.println(getPhotocellState());
       return;
     }
-    logError(Serial, "Usage: PHOTO ON|OFF|THRESH <0-1023>|SPEED <0-255>|READ");
+    logError(Serial, "Usage: PHOTO START|STOP|FOLLOW ON|OFF|THRESH <0-1023>|READ");
+    return;
+  }
+
+  if (c1 == "SCAN") {
+    String c2 = nextWord(u, i);
+    if (c2 == "START") {
+      setObjectDetectEnabled(true);
+      logInfo(Serial, "Object-detect ON");
+      return;
+    }
+    if (c2 == "STOP") {
+      setObjectDetectEnabled(false);
+      logInfo(Serial, "Object-detect OFF");
+      return;
+    }
+    if (c2 == "READ") {
+      odPrintMap();
+      return;
+    }
+    if (c2 == "STATUS") {
+      odPrintStatus();
+      return;
+    }
+    if (c2 == "SPEED") {
+      int sp;
+      if (!nextInt(u, i, sp)) { logError(Serial, "SCAN SPEED needs <0-255>"); return; }
+      setOdSpinSpeed(clamp255(sp));
+      Serial.print(F("odSpinSpeed=")); Serial.println(getOdSpinSpeed());
+      return;
+    }
+    if (c2 == "STEP") {
+      int ms;
+      if (!nextInt(u, i, ms)) { logError(Serial, "SCAN STEP needs <ms>"); return; }
+      setOdMsPerStep(ms);
+      Serial.print(F("odMsPerStep=")); Serial.println(getOdMsPerStep());
+      return;
+    }
+    if (c2 == "SETTLE") {
+      int ms;
+      if (!nextInt(u, i, ms)) { logError(Serial, "SCAN SETTLE needs <ms>"); return; }
+      setOdSettleMs(ms);
+      Serial.print(F("odSettleMs=")); Serial.println(getOdSettleMs());
+      return;
+    }
+    if (c2 == "DRIVE") {
+      int ms;
+      if (!nextInt(u, i, ms)) { logError(Serial, "SCAN DRIVE needs <ms>"); return; }
+      setOdDriveMs(ms);
+      Serial.print(F("odDriveMs=")); Serial.println(getOdDriveMs());
+      return;
+    }
+    if (c2 == "DSPEED") {
+      int sp;
+      if (!nextInt(u, i, sp)) { logError(Serial, "SCAN DSPEED needs <0-255>"); return; }
+      setOdDriveSpeed(clamp255(sp));
+      Serial.print(F("odDriveSpeed=")); Serial.println(getOdDriveSpeed());
+      return;
+    }
+    if (c2 == "MAXCM") {
+      int cm;
+      if (!nextInt(u, i, cm)) { logError(Serial, "SCAN MAXCM needs <cm>"); return; }
+      setOdObjectMaxCm((float)cm);
+      Serial.print(F("odObjectMaxCm=")); Serial.println(getOdObjectMaxCm(), 1);
+      return;
+    }
+    logError(Serial, "Usage: SCAN START|STOP|READ|STATUS|SPEED|STEP|SETTLE|DRIVE|DSPEED|MAXCM");
     return;
   }
 
