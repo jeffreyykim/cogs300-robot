@@ -105,6 +105,10 @@ void  setOdDriveMs(int ms);
 int   getOdDriveMs();
 void  setOdObjectMaxCm(float c);
 float getOdObjectMaxCm();
+void  setOdTouchCm(float c);
+float getOdTouchCm();
+void  setOdDriveMinProb(float p);
+float getOdDriveMinProb();
 void  odPrintMap();
 void  odPrintStatus();
 
@@ -225,6 +229,8 @@ static void printHelp() {
   Serial.println(F("  SCAN DRIVE  <ms>           (drive duration per approach)"));
   Serial.println(F("  SCAN DSPEED <0-255>        (drive speed when approaching)"));
   Serial.println(F("  SCAN MAXCM  <cm>           (close-reading threshold)"));
+  Serial.println(F("  SCAN TOUCH  <cm>           (stop when this close to object, default 8)"));
+  Serial.println(F("  SCAN MINP   <prob*100>     (min Bayes prob to drive, e.g. 65 = 0.65)"));
   Serial.println();
   Serial.println(F("Serial Monitor: 9600 baud, Newline line ending"));
 }
@@ -405,7 +411,7 @@ static void handleCommand(String cmd) {
       nextInt(u, i, sp);
       sp = clamp255(sp);
       logInfo(Serial, "OK SPINL");
-      turnInPlace(sp, true); // CW
+      turnInPlace(sp, false); // CCW = nose turns left
       startTimed((unsigned long)ms);
       return;
     }
@@ -415,7 +421,7 @@ static void handleCommand(String cmd) {
       nextInt(u, i, sp);
       sp = clamp255(sp);
       logInfo(Serial, "OK SPINR");
-      turnInPlace(sp, false); // CCW
+      turnInPlace(sp, true); // CW = nose turns right
       startTimed((unsigned long)ms);
       return;
     }
@@ -728,7 +734,21 @@ static void handleCommand(String cmd) {
       Serial.print(F("odObjectMaxCm=")); Serial.println(getOdObjectMaxCm(), 1);
       return;
     }
-    logError(Serial, "Usage: SCAN START|STOP|READ|STATUS|SPEED|STEP|SETTLE|DRIVE|DSPEED|MAXCM");
+    if (c2 == "TOUCH") {
+      int cm;
+      if (!nextInt(u, i, cm)) { logError(Serial, "SCAN TOUCH needs <cm>"); return; }
+      setOdTouchCm((float)cm);
+      Serial.print(F("odTouchCm=")); Serial.println(getOdTouchCm(), 1);
+      return;
+    }
+    if (c2 == "MINP") {
+      int p100;
+      if (!nextInt(u, i, p100)) { logError(Serial, "SCAN MINP needs <prob*100, e.g. 65>"); return; }
+      setOdDriveMinProb(p100 / 100.0f);
+      Serial.print(F("odDriveMinProb=")); Serial.println(getOdDriveMinProb(), 2);
+      return;
+    }
+    logError(Serial, "Usage: SCAN START|STOP|READ|STATUS|SPEED|STEP|SETTLE|DRIVE|DSPEED|MAXCM|TOUCH|MINP");
     return;
   }
 

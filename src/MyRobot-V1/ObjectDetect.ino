@@ -41,6 +41,7 @@
  *   SCAN DRIVE  <ms>    – drive time per approach step
  *   SCAN DSPEED <0-255> – forward drive speed
  *   SCAN MAXCM  <cm>    – distance threshold "close = possible object"
+ *   SCAN TOUCH  <cm>    – stop and declare success when this close (default 8)
  */
 
 // ---- forward declarations (other .ino files) --------
@@ -59,9 +60,11 @@ static const float OD_STEP_DEG   = 22.5f;
 static int   od_spinSpeed  = 160;   // PWM for in-place spin (tune per robot)
 static int   od_msPerStep  = 125;   // ms to spin exactly 22.5° (calibrate!)
 static int   od_settleMs   = 80;    // vibration settle before each reading (ms)
-static int   od_driveSpeed = 180;   // forward speed when approaching object
-static int   od_driveMs    = 700;   // how long to drive per approach burst (ms)
-static float od_objectMaxCm = 80.0f; // distances below this count as "close"
+static int   od_driveSpeed  = 180;   // forward speed when approaching object
+static int   od_driveMs     = 700;   // how long to drive per approach burst (ms)
+static float od_objectMaxCm  = 80.0f; // distances below this count as "close"
+static float od_touchCm      = 8.0f;  // stop and declare success when this close
+static float od_driveMinProb = 0.65f; // min Bayes prob required before driving
 
 // ---- Bayes filter likelihoods ----
 static const float OD_LHOBJ  = 0.80f; // P(close reading | object present)
@@ -292,13 +295,28 @@ void objectDetectTick() {
           // Store total align time in od_stepIdx (reuse variable)
           od_stepIdx = returnSteps;
         } else {
+          bool confident = (od_bayesProb[od_targetIdx] >= od_driveMinProb);
+
           Serial.print(F("ObjectDetect: target step="));
           Serial.print(od_targetIdx);
           Serial.print(F("  ("));
           Serial.print((int)(od_targetIdx * OD_STEP_DEG));
           Serial.println(F(" deg CW from start)"));
           Serial.print(F("  dist="));
-          Serial.println(od_depthMap[od_targetIdx], 1);
+          Serial.print(od_depthMap[od_targetIdx], 1);
+          Serial.print(F("  prob="));
+          Serial.println(od_bayesProb[od_targetIdx], 3);
+
+          // Not confident enough – spin back and re-scan
+          if (!confident) {
+            Serial.println(F("ObjectDetect: prob too low – re-scanning"));
+            int returnSteps = OD_NUM_STEPS - 1;
+            od_stepIdx  = returnSteps;
+            od_timerMs  = millis();
+            od_state    = OD_ALIGNING;
+            turnInPlace(od_spinSpeed, false);  // CCW back to start
+            break;
+          }
 
           // After a full CW sweep we are now (OD_NUM_STEPS-1) steps CW of start.
           // Need to spin (OD_NUM_STEPS-1 - targetIdx) steps CCW to face target.
@@ -341,13 +359,15 @@ void objectDetectTick() {
     }
 
     // ── driving toward the object ────────────────────────────────────────────
-    case OD_DRIVING:
+    case OD_DRIVING: {
+      // Timed burst expired – re-scan
       if ((long)(now - od_timerMs) >= (long)od_driveMs) {
         stop();
         Serial.println(F("ObjectDetect: drive done – re-scanning"));
         startSweep();
       }
       break;
+    }
 
     case OD_IDLE:
     default:
@@ -378,6 +398,12 @@ int   getOdDriveMs()            { return od_driveMs; }
 void  setOdObjectMaxCm(float c){ od_objectMaxCm = c; }
 float getOdObjectMaxCm()        { return od_objectMaxCm; }
 
+void  setOdTouchCm(float c)    { od_touchCm = c; }
+float getOdTouchCm()            { return od_touchCm; }
+
+void  setOdDriveMinProb(float p){ od_driveMinProb = p; }
+float getOdDriveMinProb()        { return od_driveMinProb; }
+
 /** Print depth map + Bayes probabilities (for manual inspection). */
 void odPrintMap() {
   printDepthMap();
@@ -392,7 +418,7 @@ void odPrintStatus() {
   Serial.print(F("settleMs="));       Serial.println(od_settleMs);
   Serial.print(F("driveSpeed="));     Serial.println(od_driveSpeed);
   Serial.print(F("driveMs="));        Serial.println(od_driveMs);
-  Serial.print(F("objectMaxCm="));    Serial.println(od_objectMaxCm, 1);
-  Serial.print(F("numSteps="));       Serial.println(OD_NUM_STEPS);
+  Serial.print(F("objectMaxCm="));    Serial.println(od_objectMaxCm, 1);  Serial.print(F("touchCm=="));         Serial.println(od_touchCm, 1);
+  Serial.print(F("driveMinProb=="));     Serial.println(od_driveMinProb, 2);  Serial.print(F("numSteps="));       Serial.println(OD_NUM_STEPS);
   Serial.print(F("stepDeg="));        Serial.println(OD_STEP_DEG, 1);
 }
